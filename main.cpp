@@ -5,6 +5,7 @@
 #include <string>
 #include <dlfcn.h>
 #include <stdexcept>
+#include <random>
 
 class StringArray {
 private:
@@ -252,7 +253,7 @@ public:
         }
 
         std::string content;
-        char buffer[128]; // Read in chunks of 128 bytes.
+        char buffer[128];
         while (!file.eof()) {
             file.read(buffer, sizeof(buffer));
             content.append(buffer, file.gcount());
@@ -289,7 +290,6 @@ public:
     }
 };
 
-
 int main() {
     void *library = dlopen("/Users/zakerden1234/Desktop/PPHW-Task4/encryption.dylib", RTLD_LAZY);
 
@@ -298,9 +298,8 @@ int main() {
         return 1;
     }
 
-    // Function pointers
-    typedef void (*EncryptFunction)(const std::string &inputText, const std::string &keyString);
-    typedef void (*DecryptFunction)(const std::string &inputText, const std::string &keyString);
+    typedef std::string (*EncryptFunction)(const std::string &inputText, const std::string &keyString);
+    typedef std::string (*DecryptFunction)(const std::string &inputText, const std::string &keyString);
 
     EncryptFunction encrypt = (EncryptFunction)dlsym(library, "encrypt");
     DecryptFunction decrypt = (DecryptFunction)dlsym(library, "decrypt");
@@ -326,10 +325,11 @@ int main() {
                  "10 - Redo\n"
                  "11 - Cut\n"
                  "12 - Copy\n"
-                 "13 - Paste\n";
+                 "13 - Paste\n"
+                 "14 - Encryptor\n";
 
     while (true) {
-        std::cout << "Write command 1-13: ";
+        std::cout << "Write command 1-14: ";
         std::cin >> command;
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
@@ -456,14 +456,41 @@ int main() {
                         std::string content = reader->Read(inputFilePath);
 
                         if (operation == "encrypt") {
-                            // Шифруємо контент за допомогою бібліотеки
-                            encrypt(content, key);
+                            content = encrypt(content, key);
+
                         } else if (operation == "decrypt") {
                             // Дешифруємо контент за допомогою бібліотеки
-                            decrypt(content, key);
+                            content = decrypt(content, key);
                         } else {
                             std::cerr << "Invalid operation. Please choose 'encrypt' or 'decrypt'." << std::endl;
                         }
+
+                        writer->Write(outputFilePath, content);
+                        std::cout << "Operation completed successfully." << std::endl;
+
+                        delete reader;
+                        delete writer;
+                    } catch (const std::exception &e) {
+                        std::cerr << "Error: " << e.what() << std::endl;
+                    }
+                } else if (mode == 2) {
+                    std::cout << "Enter input file path: ";
+                    std::cin >> inputFilePath;
+
+                    std::cout << "Enter output file path: ";
+                    std::cin >> outputFilePath;
+
+                    try {
+                        IReader *reader = new FileReader();
+                        IWriter *writer = new FileWriter();
+                        std::string content = reader->Read(inputFilePath);
+
+                        std::random_device rd;
+                        std::mt19937 gen(rd());
+                        std::uniform_int_distribution<int> distribution(1, 100);
+                        int randomKey = distribution(gen);
+
+                        content = encrypt(content, std::to_string(randomKey));
 
                         writer->Write(outputFilePath, content);
                         std::cout << "Operation completed successfully." << std::endl;
