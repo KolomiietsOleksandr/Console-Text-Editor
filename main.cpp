@@ -291,6 +291,25 @@ public:
 
 
 int main() {
+    void *library = dlopen("/Users/zakerden1234/Desktop/PPHW-Task4/encryption.dylib", RTLD_LAZY);
+
+    if (!library) {
+        std::cerr << "Failed to load the library: " << dlerror() << std::endl;
+        return 1;
+    }
+
+    // Function pointers
+    typedef void (*EncryptFunction)(const std::string &inputText, const std::string &keyString);
+    typedef void (*DecryptFunction)(const std::string &inputText, const std::string &keyString);
+
+    EncryptFunction encrypt = (EncryptFunction)dlsym(library, "encrypt");
+    DecryptFunction decrypt = (DecryptFunction)dlsym(library, "decrypt");
+
+    if (!encrypt || !decrypt) {
+        std::cerr << "Failed to load functions: " << dlerror() << std::endl;
+        return 1;
+    }
+
     int command = 0;
     StringArray stringArray;
     std::string fileName;
@@ -408,6 +427,58 @@ int main() {
                 std::cout << "Choose line and position to paste: ";
                 std::cin >> pasteLine >> pastePos;
                 stringArray.paste(pasteLine, pastePos);
+                break;
+            }
+            case 14: {
+                int mode = 0;
+                std::cout << "Choose mode: 1 for Normal mode, 2 for Secret mode: ";
+                std::cin >> mode;
+
+                std::string inputFilePath, outputFilePath, key;
+
+                if (mode == 1) {
+                    std::string operation;
+                    std::cout << "Choose operation: 'encrypt' or 'decrypt': ";
+                    std::cin >> operation;
+
+                    std::cout << "Enter input file path: ";
+                    std::cin >> inputFilePath;
+
+                    std::cout << "Enter output file path: ";
+                    std::cin >> outputFilePath;
+
+                    std::cout << "Enter the key: ";
+                    std::cin >> key;
+
+                    try {
+                        IReader *reader = new FileReader();
+                        IWriter *writer = new FileWriter();
+                        std::string content = reader->Read(inputFilePath);
+
+                        if (operation == "encrypt") {
+                            // Шифруємо контент за допомогою бібліотеки
+                            encrypt(content, key);
+                        } else if (operation == "decrypt") {
+                            // Дешифруємо контент за допомогою бібліотеки
+                            decrypt(content, key);
+                        } else {
+                            std::cerr << "Invalid operation. Please choose 'encrypt' or 'decrypt'." << std::endl;
+                        }
+
+                        writer->Write(outputFilePath, content);
+                        std::cout << "Operation completed successfully." << std::endl;
+
+                        delete reader;
+                        delete writer;
+                    } catch (const std::exception &e) {
+                        std::cerr << "Error: " << e.what() << std::endl;
+                    }
+                }
+            }
+            default: {
+                if (command < 0 || command > 14) {
+                    std::cout << "The command is not implemented." << std::endl;
+                }
                 break;
             }
         }
