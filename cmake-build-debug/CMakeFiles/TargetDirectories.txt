@@ -1,0 +1,3 @@
+/Users/zakerden1234/Desktop/PPHW-Task4/cmake-build-debug/CMakeFiles/Hm2PP.dir
+/Users/zakerden1234/Desktop/PPHW-Task4/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/zakerden1234/Desktop/PPHW-Task4/cmake-build-debug/CMakeFiles/rebuild_cache.dir
