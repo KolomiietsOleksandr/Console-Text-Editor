@@ -290,24 +290,262 @@ public:
     }
 };
 
-int main() {
-    void *library = dlopen("/Users/zakerden1234/Desktop/PPHW-Task4/encryption.dylib", RTLD_LAZY);
+class EncryptionLibrary {
+public:
+    EncryptionLibrary(const std::string &libraryPath) {
+        library_ = dlopen(libraryPath.c_str(), RTLD_LAZY);
+        if (!library_) {
+            std::cerr << "Failed to load the library: " << dlerror() << std::endl;
+            return;
+        }
 
-    if (!library) {
-        std::cerr << "Failed to load the library: " << dlerror() << std::endl;
-        return 1;
+        encrypt_ = (EncryptFunction)dlsym(library_, "encrypt");
+        decrypt_ = (DecryptFunction)dlsym(library_, "decrypt");
+
+        if (!encrypt_ || !decrypt_) {
+            std::cerr << "Failed to load functions: " << dlerror() << std::endl;
+        }
     }
 
+    ~EncryptionLibrary() {
+        if (library_) {
+            dlclose(library_);
+        }
+    }
+
+    std::string encrypt(const std::string &inputText, const std::string &keyString) {
+        if (encrypt_) {
+            return encrypt_(inputText, keyString);
+        } else {
+            return "Encryption function not loaded";
+        }
+    }
+
+    std::string decrypt(const std::string &inputText, const std::string &keyString) {
+        if (decrypt_) {
+            return decrypt_(inputText, keyString);
+        } else {
+            return "Decryption function not loaded";
+        }
+    }
+
+private:
+    void *library_;
     typedef std::string (*EncryptFunction)(const std::string &inputText, const std::string &keyString);
     typedef std::string (*DecryptFunction)(const std::string &inputText, const std::string &keyString);
+    EncryptFunction encrypt_;
+    DecryptFunction decrypt_;
+};
 
-    EncryptFunction encrypt = (EncryptFunction)dlsym(library, "encrypt");
-    DecryptFunction decrypt = (DecryptFunction)dlsym(library, "decrypt");
-
-    if (!encrypt || !decrypt) {
-        std::cerr << "Failed to load functions: " << dlerror() << std::endl;
-        return 1;
+class RandomKeyGenerator {
+public:
+    RandomKeyGenerator() {
+        std::random_device rd;
+        generator_ = std::mt19937(rd());
+        distribution_ = std::uniform_int_distribution<int>(1, 100);
     }
+
+    int GenerateRandomKey() {
+        return distribution_(generator_);
+    }
+
+private:
+    std::mt19937 generator_;
+    std::uniform_int_distribution<int> distribution_;
+};
+
+class EncryptionHandler {
+public:
+    EncryptionHandler(const char* libraryPath) : encryptionLibrary(libraryPath) {}
+
+    void process() {
+        int mode = 0;
+        std::cout << "Choose mode: 1 for Normal mode, 2 for Secret mode: ";
+        std::cin >> mode;
+
+        std::string inputFilePath, outputFilePath, key;
+
+        // Normal mode
+        if (mode == 1) {
+            std::string operation;
+            std::cout << "Choose operation: 'encrypt' or 'decrypt': ";
+            std::cin >> operation;
+
+            std::cout << "Enter input file path: ";
+            std::cin >> inputFilePath;
+
+            std::cout << "Enter output file path: ";
+            std::cin >> outputFilePath;
+
+            std::cout << "Enter the key: ";
+            std::cin >> key;
+
+            try {
+                IReader *reader = new FileReader();
+                IWriter *writer = new FileWriter();
+                std::string content = reader->Read(inputFilePath);
+
+                if (operation == "encrypt") {
+                    content = encryptionLibrary.encrypt(content, key);
+                } else if (operation == "decrypt") {
+                    content = encryptionLibrary.decrypt(content, key);
+                } else {
+                    std::cerr << "Invalid operation. Please choose 'encrypt' or 'decrypt'." << std::endl;
+                }
+
+                writer->Write(outputFilePath, content);
+                std::cout << "Operation completed successfully." << std::endl;
+
+                delete reader;
+                delete writer;
+                encryptionLibrary.~EncryptionLibrary();
+            } catch (const std::exception &e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+            }
+        // Secret mode
+        } else if (mode == 2) {
+            RandomKeyGenerator keyGenerator;
+
+            std::cout << "Enter input file path: ";
+            std::cin >> inputFilePath;
+
+            std::cout << "Enter output file path: ";
+            std::cin >> outputFilePath;
+
+            try {
+                IReader *reader = new FileReader();
+                IWriter *writer = new FileWriter();
+                std::string content = reader->Read(inputFilePath);
+
+                int randomKey = keyGenerator.GenerateRandomKey();
+
+                content = encryptionLibrary.encrypt(content, std::to_string(randomKey));
+
+                writer->Write(outputFilePath, content);
+                std::cout << "Operation completed successfully." << std::endl;
+
+                delete reader;
+                delete writer;
+                encryptionLibrary.~EncryptionLibrary();
+            } catch (const std::exception &e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+            }
+        }
+    }
+
+private:
+    EncryptionLibrary encryptionLibrary;
+};
+
+class Processes{
+private:
+    StringArray stringArray;
+    std::string fileName;
+public:
+    void append(){
+        std::string buffer;
+        std::cout << "Write text to append: ";
+        std::getline(std::cin, buffer);
+        stringArray.addString(buffer);
+    }
+
+    void emptyLine(){
+        stringArray.addEmptyLine();
+    }
+
+    void show(){
+        stringArray.printStrings();
+    }
+
+    void save(){
+        std::cout << "Write file name to SAVE: ";
+        std::cin >> fileName;
+        FilesSL::saveToFile(fileName, stringArray.getStrings());
+    }
+
+    void load(){
+        std::cout << "Write file name to LOAD: ";
+        std::cin >> fileName;
+        stringArray.setStrings(FilesSL::loadFromFile(fileName));
+    }
+
+    void search(){
+        std::string substring;
+
+        std::cout << "Enter substring to search for: ";
+        std::cin >> substring;
+
+        SearchFunctions::searchSubstringInArray(stringArray.getStrings(), substring);
+    }
+
+    void insert(){
+        int lineIndex, position;
+        std::string substring;
+        bool replaceMode;
+
+        std::cout << "Enter line index for insertion: ";
+        std::cin >> lineIndex;
+
+        std::cout << "Enter position for insertion (0-" << stringArray.getStringCount() << "): ";
+        std::cin >> position;
+
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+        std::cout << "Enter substring to insert: ";
+        std::getline(std::cin, substring);
+
+        std::cout << "Replace existing text (1 for yes, 0 for no): ";
+        std::cin >> replaceMode;
+
+        stringArray.insertSubstring(lineIndex, position, substring, replaceMode);
+    }
+
+    void dalete(){
+        int lineIndex, position, length;
+
+        std::cout << "Choose line, index, and number of symbols to delete: ";
+        std::cin >> lineIndex >> position >> length;
+        stringArray.deleteSubstring(lineIndex, position, length);
+    }
+
+    void undo(){
+        stringArray.undo();
+    }
+
+    void redo(){
+        stringArray.undo();
+    }
+
+    void cut(){
+        int cutLine, cutPos, cutLen;
+        std::cout << "Choose line, position, and length to cut: ";
+        std::cin >> cutLine >> cutPos >> cutLen;
+        stringArray.cut(cutLine, cutPos, cutLen);
+    }
+
+    void copy(){
+        int copyLine, copyPos, copyLen;
+        std::cout << "Choose line, position, and length to copy: ";
+        std::cin >> copyLine >> copyPos >> copyLen;
+        stringArray.copy(copyLine, copyPos, copyLen);
+    }
+
+    void paste(){
+        int pasteLine, pastePos;
+        std::cout << "Choose line and position to paste: ";
+        std::cin >> pasteLine >> pastePos;
+        stringArray.paste(pasteLine, pastePos);
+    }
+
+    void encryptor(){
+        const char* relativePath = "./encryption.dylib";
+        EncryptionHandler handler(relativePath);
+        handler.process();
+    }
+};
+
+int main() {
+    Processes processes;
 
     int command = 0;
     StringArray stringArray;
@@ -335,172 +573,74 @@ int main() {
 
         switch (command) {
             case 1: {
-                std::string buffer;
-                std::cout << "Write text to append: ";
-                std::getline(std::cin, buffer);
-                stringArray.addString(buffer);
+                processes.append();
+
                 break;
             }
             case 2: {
-                stringArray.addEmptyLine();
+                processes.emptyLine();
+
                 break;
             }
             case 3: {
-                stringArray.printStrings();
+                processes.show();
+
                 break;
             }
             case 4: {
-                std::cout << "Write file name to SAVE: ";
-                std::cin >> fileName;
-                FilesSL::saveToFile(fileName, stringArray.getStrings());
+                processes.save();
+
                 break;
             }
             case 5: {
-                std::cout << "Write file name to LOAD: ";
-                std::cin >> fileName;
-                stringArray.setStrings(FilesSL::loadFromFile(fileName));
+                processes.load();
+
                 break;
             }
             case 6: {
-                std::string substring;
+                processes.search();
 
-                std::cout << "Enter substring to search for: ";
-                std::cin >> substring;
-
-                SearchFunctions::searchSubstringInArray(stringArray.getStrings(), substring);
                 break;
             }
             case 7: {
-                int lineIndex, position;
-                std::string substring;
-                bool replaceMode;
+                processes.insert();
 
-                std::cout << "Enter line index for insertion: ";
-                std::cin >> lineIndex;
-
-                std::cout << "Enter position for insertion (0-" << stringArray.getStringCount() << "): ";
-                std::cin >> position;
-
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-                std::cout << "Enter substring to insert: ";
-                std::getline(std::cin, substring);
-
-                std::cout << "Replace existing text (1 for yes, 0 for no): ";
-                std::cin >> replaceMode;
-
-                stringArray.insertSubstring(lineIndex, position, substring, replaceMode);
                 break;
             }
             case 8: {
-                int lineIndex, position, length;
+                processes.dalete();
 
-                std::cout << "Choose line, index, and number of symbols to delete: ";
-                std::cin >> lineIndex >> position >> length;
-                stringArray.deleteSubstring(lineIndex, position, length);
                 break;
             }
             case 9: {
-                stringArray.undo();
+                processes.undo();
+
                 break;
             }
             case 10: {
-                stringArray.redo();
+                processes.redo();
+
                 break;
             }
             case 11: {
-                int cutLine, cutPos, cutLen;
-                std::cout << "Choose line, position, and length to cut: ";
-                std::cin >> cutLine >> cutPos >> cutLen;
-                stringArray.cut(cutLine, cutPos, cutLen);
+                processes.cut();
+
                 break;
             }
             case 12: {
-                int copyLine, copyPos, copyLen;
-                std::cout << "Choose line, position, and length to copy: ";
-                std::cin >> copyLine >> copyPos >> copyLen;
-                stringArray.copy(copyLine, copyPos, copyLen);
+                processes.copy();
+
                 break;
             }
             case 13: {
-                int pasteLine, pastePos;
-                std::cout << "Choose line and position to paste: ";
-                std::cin >> pasteLine >> pastePos;
-                stringArray.paste(pasteLine, pastePos);
+                processes.paste();
+
                 break;
             }
             case 14: {
-                int mode = 0;
-                std::cout << "Choose mode: 1 for Normal mode, 2 for Secret mode: ";
-                std::cin >> mode;
+                processes.encryptor();
 
-                std::string inputFilePath, outputFilePath, key;
-
-                if (mode == 1) {
-                    std::string operation;
-                    std::cout << "Choose operation: 'encrypt' or 'decrypt': ";
-                    std::cin >> operation;
-
-                    std::cout << "Enter input file path: ";
-                    std::cin >> inputFilePath;
-
-                    std::cout << "Enter output file path: ";
-                    std::cin >> outputFilePath;
-
-                    std::cout << "Enter the key: ";
-                    std::cin >> key;
-
-                    try {
-                        IReader *reader = new FileReader();
-                        IWriter *writer = new FileWriter();
-                        std::string content = reader->Read(inputFilePath);
-
-                        if (operation == "encrypt") {
-                            content = encrypt(content, key);
-
-                        } else if (operation == "decrypt") {
-                            // Дешифруємо контент за допомогою бібліотеки
-                            content = decrypt(content, key);
-                        } else {
-                            std::cerr << "Invalid operation. Please choose 'encrypt' or 'decrypt'." << std::endl;
-                        }
-
-                        writer->Write(outputFilePath, content);
-                        std::cout << "Operation completed successfully." << std::endl;
-
-                        delete reader;
-                        delete writer;
-                    } catch (const std::exception &e) {
-                        std::cerr << "Error: " << e.what() << std::endl;
-                    }
-                } else if (mode == 2) {
-                    std::cout << "Enter input file path: ";
-                    std::cin >> inputFilePath;
-
-                    std::cout << "Enter output file path: ";
-                    std::cin >> outputFilePath;
-
-                    try {
-                        IReader *reader = new FileReader();
-                        IWriter *writer = new FileWriter();
-                        std::string content = reader->Read(inputFilePath);
-
-                        std::random_device rd;
-                        std::mt19937 gen(rd());
-                        std::uniform_int_distribution<int> distribution(1, 100);
-                        int randomKey = distribution(gen);
-
-                        content = encrypt(content, std::to_string(randomKey));
-
-                        writer->Write(outputFilePath, content);
-                        std::cout << "Operation completed successfully." << std::endl;
-
-                        delete reader;
-                        delete writer;
-                    } catch (const std::exception &e) {
-                        std::cerr << "Error: " << e.what() << std::endl;
-                    }
-                }
+                break;
             }
             default: {
                 if (command < 0 || command > 14) {
